@@ -33,22 +33,23 @@ import (
 	cryptocoinsconfig "github.com/fsn-dev/cryptoCoins/coins/config"
 	"github.com/fsn-dev/cryptoCoins/coins/eos"
 	"github.com/fsn-dev/cryptoCoins/coins/types"
-	"github.com/fsn-dev/dcrm-walletService/internal/common"
-	p2pdcrm "github.com/fsn-dev/dcrm-walletService/p2p/layer2"
+	"github.com/anyswap/Anyswap-MPCNode/internal/common"
+	p2pdcrm "github.com/anyswap/Anyswap-MPCNode/p2p/layer2"
 	"github.com/fsn-dev/cryptoCoins/tools/rlp"
-	"github.com/fsn-dev/dcrm-walletService/ethdb"
-	"github.com/fsn-dev/dcrm-walletService/mpcdsa/crypto/ec2"
-	"github.com/fsn-dev/dcrm-walletService/p2p/discover"
+	"github.com/anyswap/Anyswap-MPCNode/ethdb"
+	//"github.com/anyswap/Anyswap-MPCNode/mpcdsa/crypto/ec2"
+	"github.com/anyswap/Anyswap-MPCNode/p2p/discover"
 	"encoding/gob"
 	"sort"
 	"compress/zlib"
-	"github.com/fsn-dev/dcrm-walletService/crypto/sha3"
+	"github.com/anyswap/Anyswap-MPCNode/crypto/sha3"
 	"io"
-	"github.com/fsn-dev/dcrm-walletService/internal/common/hexutil"
-	"github.com/fsn-dev/dcrm-walletService/mpcdsa/crypto/ed"
-	"github.com/fsn-dev/dcrm-walletService/crypto/secp256k1"
+	"github.com/anyswap/Anyswap-MPCNode/internal/common/hexutil"
+	"github.com/anyswap/Anyswap-MPCNode/mpcdsa/crypto/ed"
+	"github.com/anyswap/Anyswap-MPCNode/crypto/secp256k1"
 	"crypto/hmac"
 	"crypto/sha512"
+	dcrmlibec2 "github.com/anyswap/Anyswap-MPCNode/dcrm-lib/crypto/ec2"
 )
 
 var (
@@ -223,8 +224,11 @@ func InitDev(keyfile string) {
 	go SavePubKeyDataToDb()
 	go SaveSkU1ToDb()
 	go SaveBip32CToDb()
-	go ec2.GenRandomInt(2048)
-	go ec2.GenRandomSafePrime(2048)
+	//go ec2.GenRandomInt(2048)
+	//go ec2.GenRandomSafePrime(2048)
+	
+	go dcrmlibec2.GenRandomInt(2048)
+	go dcrmlibec2.GenRandomSafePrime(2048)
 }
 
 func InitGroupInfo(groupId string) {

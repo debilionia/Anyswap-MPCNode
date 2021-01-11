@@ -20,7 +20,8 @@ import (
 	"container/list"
 	"fmt"
 	"strings"
-	"github.com/fsn-dev/dcrm-walletService/internal/common"
+	"github.com/anyswap/Anyswap-MPCNode/internal/common"
+	dcrmlib "github.com/anyswap/Anyswap-MPCNode/dcrm-lib/dcrm"
 )
 
 var (
@@ -169,6 +170,14 @@ type RPCReqWorker struct {
 	acceptWaitReShareChan chan string
 	acceptSignChan     chan string
 	acceptWaitSignChan chan string
+	
+	//for dcrm lib 
+	msg_wire   *list.List
+	bwire chan bool
+	DcrmMsg chan string
+	DNode dcrmlib.DNode
+	MsgToEnode map[string]string
+	PreSaveDcrmMsg []string
 }
 
 //workers,RpcMaxWorker,RpcReqWorker,RpcReqQueue,RpcMaxQueue,ReqDispatcher
@@ -361,6 +370,12 @@ func NewRPCReqWorker(workerPool chan chan RPCReq) *RPCReqWorker {
 		acceptWaitReShareChan: make(chan string, 1),
 		acceptSignChan:     make(chan string, 1),
 		acceptWaitSignChan: make(chan string, 1),
+		
+		msg_wire:                    list.New(),
+		bwire:               make(chan bool, 1),
+		DcrmMsg:            make(chan string,20000),
+		MsgToEnode:            make(map[string]string),
+		PreSaveDcrmMsg:     make([]string,0),
 	}
 }
 
@@ -763,6 +778,18 @@ func (w *RPCReqWorker) Clear() {
 	if len(w.acceptWaitSignChan) == 1 {
 		<-w.acceptWaitSignChan
 	}
+	
+	for e := w.msg_wire.Front(); e != nil; e = next {
+		next = e.Next()
+		w.msg_wire.Remove(e)
+	}
+	if len(w.bwire) == 1 {
+		<-w.bwire
+	}
+	w.DcrmMsg = make(chan string,20000)
+	w.DNode = nil
+	w.MsgToEnode = make(map[string]string)
+	w.PreSaveDcrmMsg = make([]string,0)
 }
 
 func (w *RPCReqWorker) Clear2() {
@@ -1156,6 +1183,18 @@ func (w *RPCReqWorker) Clear2() {
 	if len(w.acceptWaitSignChan) == 1 {
 		<-w.acceptWaitSignChan
 	}
+	
+	for e := w.msg_wire.Front(); e != nil; e = next {
+		next = e.Next()
+		w.msg_wire.Remove(e)
+	}
+	if len(w.bwire) == 1 {
+		<-w.bwire
+	}
+	w.DcrmMsg = make(chan string,20000)
+	w.DNode = nil
+	w.MsgToEnode = make(map[string]string)
+	w.PreSaveDcrmMsg = make([]string,0)
 }
 
 func (w *RPCReqWorker) Start() {

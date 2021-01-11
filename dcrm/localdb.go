@@ -17,12 +17,12 @@
 package dcrm 
 
 import (
-    "github.com/fsn-dev/dcrm-walletService/internal/common"
-    "github.com/fsn-dev/dcrm-walletService/internal/common/fdlimit"
-    "github.com/fsn-dev/dcrm-walletService/ethdb"
+    "github.com/anyswap/Anyswap-MPCNode/internal/common"
+    "github.com/anyswap/Anyswap-MPCNode/internal/common/fdlimit"
+    "github.com/anyswap/Anyswap-MPCNode/ethdb"
     "time"
     "sync"
-    "github.com/fsn-dev/dcrm-walletService/p2p/discover"
+    "github.com/anyswap/Anyswap-MPCNode/p2p/discover"
 )
 
 var (

@@ -17,8 +17,8 @@
 package dcrm 
 
 import (
-	"github.com/fsn-dev/dcrm-walletService/internal/common"
-	"github.com/fsn-dev/dcrm-walletService/crypto/secp256k1"
+	"github.com/anyswap/Anyswap-MPCNode/internal/common"
+	"github.com/anyswap/Anyswap-MPCNode/crypto/secp256k1"
 	"strings"
 	"math/big"
 	"encoding/hex"
@@ -27,10 +27,10 @@ import (
 	"container/list"
 	"github.com/fsn-dev/cryptoCoins/coins"
 	"crypto/ecdsa"
-	"github.com/fsn-dev/dcrm-walletService/crypto"
-	"github.com/fsn-dev/dcrm-walletService/crypto/ecies"
+	"github.com/anyswap/Anyswap-MPCNode/crypto"
+	"github.com/anyswap/Anyswap-MPCNode/crypto/ecies"
 	"strconv"
-	"github.com/fsn-dev/dcrm-walletService/p2p/discover"
+	"github.com/anyswap/Anyswap-MPCNode/p2p/discover"
 	crand "crypto/rand"
 	"github.com/fsn-dev/cryptoCoins/coins/types"
 	"github.com/fsn-dev/cryptoCoins/tools/rlp"
@@ -564,12 +564,60 @@ func Call(msg interface{}, enode string) {
 	    return
 	}
 
+	fmt.Printf("==============Call,get msg = %v ============\n",s)
+
 	////////
 	raw,err := UnCompress(s)
 	if err == nil {
 		s = raw
 	}
 	////////
+
+	msgdata, errdec := DecryptMsg(s) //for SendMsgToPeer
+	if errdec == nil {
+		s = msgdata
+	}
+	
+	msgmap := make(map[string]string)
+	err = json.Unmarshal([]byte(s), &msgmap)
+	if err == nil {
+	    val,ok := msgmap["Key"]
+	    if ok {
+		w, err := FindWorker(val)
+		if err == nil {
+		    if w.DNode != nil && w.DNode.Round() != nil {
+			fmt.Printf("\n============Call,set dcrm msg success. key = %v, msg = %v ==============\n",val,msgmap)
+			w.DcrmMsg <- s
+		    } else {
+			w.PreSaveDcrmMsg = append(w.PreSaveDcrmMsg,s)
+		    }
+		} else {
+		    fmt.Printf("\n============Call,dcrm msg arrive before keygen cmd. key = %v, msg = %v ==============\n",val,msgmap)
+		    SetUpMsgList(s, enode)
+		}
+		
+		return
+	    }
+	}
+
+	/////
+	ok,key := IsGenKeyCmd(s)
+	if ok {
+	    w, err := FindWorker(key)
+	    if err == nil {
+		fmt.Printf("\n============Call,keygen cmd arrive after dcrm msg. key = %v, msg = %v ==============\n",key,msgmap)
+		ch := make(chan interface{}, 1)
+		InitAcceptData(s,w.id,enode,ch)
+		w.bwire <-true //add for dcrm-lib
+	    } else {
+		fmt.Printf("\n============Call,keygen cmd arrive before dcrm msg. key = %v, msg = %v ==============\n",key,msgmap)
+		SetUpMsgList(s, enode)
+	    }
+	    
+	    return
+	}
+	/////
+
 	SetUpMsgList(s, enode)
 }
 
@@ -629,13 +677,41 @@ func (self *RecvMsg) Run(workid int, ch chan interface{}) bool {
 		res = msgdata
 	}
 	mm := strings.Split(res, common.Sep)
-	if len(mm) >= 2 {
+	if len(mm) >= 3 {
 		common.Debug("================RecvMsg.Run,begin to dis msg =================","res",res)
 		//msg:  key-enode:C1:X1:X2....:Xn
 		//msg:  key-enode1:NoReciv:enode2:C1
-		DisMsg(res)
+		//DisMsg(res)
+
+		prexs := strings.Split(mm[0], "-")
+		if len(prexs) >= 2 {
+		    w, err := FindWorker(prexs[0])
+		    if err == nil {
+			w.DcrmMsg <- res
+		    }
+		}
+
 		return true
 	}
+
+	////////decode p2p dcrm msg
+	msgmap := make(map[string]string)
+	err := json.Unmarshal([]byte(res), &msgmap)
+	if err == nil {
+	    val,ok := msgmap["Key"]
+	    if ok {
+		    //w, err := FindWorker(val)
+		    //if err == nil {
+		//	w.DcrmMsg <- res
+		//    }
+		w := workers[workid]
+		w.sid = val 
+		w.PreSaveDcrmMsg = append(w.PreSaveDcrmMsg,res)
+		<-w.bwire
+		return true
+	    }
+	}
+	////////
 
 	common.Debug("================RecvMsg.Run,begin to decode msg =================","res",res)
 	m, err2 := Decode2(res, "SignData")
@@ -1273,6 +1349,24 @@ func DisAcceptMsg(raw string,workid int) {
 	    workers[ac.WorkId].acceptReShareChan <- "go on"
 	}
     }
+}
+
+func IsGenKeyCmd(raw string) (bool,string) {
+    if raw == "" {
+	return false,""
+    }
+
+    key,_,_,txdata,err := CheckRaw(raw)
+    if err != nil {
+	return false,""
+    }
+    
+    _,ok := txdata.(*TxDataReqAddr)
+    if ok {
+	return true,key
+    }
+
+    return false,""
 }
 
 func InitAcceptData(raw string,workid int,sender string,ch chan interface{}) error {

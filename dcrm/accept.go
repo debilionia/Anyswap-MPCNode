@@ -16,7 +16,7 @@
 
 package dcrm 
 import (
-    "github.com/fsn-dev/dcrm-walletService/internal/common"
+    "github.com/anyswap/Anyswap-MPCNode/internal/common"
     "strings"
     "fmt"
     "math/big"

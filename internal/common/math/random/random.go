@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"math/big"
 	"time"
-	//"github.com/fsn-dev/dcrm-walletService/internal/common"
+	//"github.com/anyswap/Anyswap-MPCNode/internal/common"
 )
 
 //commitment question 2

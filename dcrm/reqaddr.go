@@ -31,11 +31,13 @@ import (
 	"sync"
 	"github.com/fsn-dev/cryptoCoins/coins"
 	"github.com/fsn-dev/cryptoCoins/coins/types"
-	"github.com/fsn-dev/dcrm-walletService/mpcdsa/crypto/ec2"
-	"github.com/fsn-dev/dcrm-walletService/mpcdsa/crypto/ed"
-	"github.com/fsn-dev/dcrm-walletService/mpcdsa/ecdsa/keygen"
-	"github.com/fsn-dev/dcrm-walletService/crypto/secp256k1"
-	"github.com/fsn-dev/dcrm-walletService/internal/common"
+	"github.com/anyswap/Anyswap-MPCNode/mpcdsa/crypto/ec2"
+	"github.com/anyswap/Anyswap-MPCNode/mpcdsa/crypto/ed"
+	"github.com/anyswap/Anyswap-MPCNode/mpcdsa/ecdsa/keygen"
+	"github.com/anyswap/Anyswap-MPCNode/crypto/secp256k1"
+	"github.com/anyswap/Anyswap-MPCNode/internal/common"
+	dcrmlib "github.com/anyswap/Anyswap-MPCNode/dcrm-lib/dcrm"
+	keygen2 "github.com/anyswap/Anyswap-MPCNode/dcrm-lib/ecdsa/keygen"
 )
 
 var (
@@ -448,7 +450,7 @@ func dcrm_genPubKey(msgprex string, account string, cointype string, ch chan int
 		return
 	}
 	spkx := iter.Value.(string)
-	pkx := new(big.Int).SetBytes([]byte(spkx))
+	pkx,_ := new(big.Int).SetString(spkx,10)
 	iter = workers[id].pky.Front()
 	if iter == nil {
 		res := RpcDcrmRes{Ret: "", Tip: "dcrm back-end internal error:get pky fail in req ec2 pubkey", Err: GetRetErr(ErrGetGenPubkeyFail)}
@@ -456,7 +458,7 @@ func dcrm_genPubKey(msgprex string, account string, cointype string, ch chan int
 		return
 	}
 	spky := iter.Value.(string)
-	pky := new(big.Int).SetBytes([]byte(spky))
+	pky,_ := new(big.Int).SetString(spky,10)
 	ys := secp256k1.S256().Marshal(pkx, pky)
 
 	iter = workers[id].save.Front()
@@ -497,6 +499,7 @@ func dcrm_genPubKey(msgprex string, account string, cointype string, ch chan int
 	rk := Keccak256Hash([]byte(strings.ToLower(account + ":" + cointype + ":" + wk.groupid + ":" + nonce + ":" + wk.limitnum + ":" + mode))).Hex()
 
 	pubkeyhex := hex.EncodeToString(ys)
+	fmt.Printf("================ dcrm_genpubkey,pkx = %v,pky = %v,pubkeyhex = %v ==================\n",pkx,pky,pubkeyhex)
 	
 	pubs := &PubKeyData{Key:msgprex,Account: account, Pub: string(ys), Save: save, Nonce: nonce, GroupId: wk.groupid, LimitNum: wk.limitnum, Mode: mode,KeyGenTime:tt}
 	epubs, err := Encode2(pubs)
@@ -573,11 +576,14 @@ func dcrm_genPubKey(msgprex string, account string, cointype string, ch chan int
 			if h == nil {
 				continue
 			}
+
 			ctaddr, err := h.PublicKeyToAddress(pubkeyhex)
 			if err != nil {
+				fmt.Printf("=========dcrm_genpubkey, pubkeyhex = %v, h = %v,err = %v ===========\n",pubkeyhex,h,err)
 				continue
 			}
 
+			fmt.Printf("=========dcrm_genpubkey, ctaddr = %v,pubkeyhex = %v, h = %v ===========\n",ctaddr,pubkeyhex,h)
 			key := Keccak256Hash([]byte(strings.ToLower(ctaddr))).Hex()
 			kd = KeyData{Key: []byte(key), Data: ss}
 			PubKeyDataChan <- kd
@@ -2564,11 +2570,52 @@ func KeyGenerate_DECDSA(msgprex string, ch chan interface{}, id int, cointype st
 		return false
 	}
 
-	ids := GetIds(cointype, w.groupid)
+	//ids := GetIds(cointype, w.groupid)
+
+	//time.Sleep(time.Duration(20) * time.Second) //tmp code
+	
+	//taskDone := make(chan struct{})
+	commStopChan := make(chan struct{})
+	outCh := make(chan dcrmlib.Message, ns)
+	endCh := make(chan dcrmlib.LocalDNodeSaveData, ns)
+	errChan := make(chan struct{})
+	keyGenDNode := keygen2.NewLocalDNode(outCh,endCh,ns,w.ThresHold,2048)
+	w.DNode = keyGenDNode
+	//keyGenDNode.SetDNodeID(fmt.Sprintf("%v",DoubleHash2(cur_enode,"ECDSA")))
+	//fmt.Printf("=========== keygen, node uid = %v ===========\n",keyGenDNode.DNodeID())
+	
+	uid,_ := new(big.Int).SetString(w.DNode.DNodeID(),10)
+	w.MsgToEnode[fmt.Sprintf("%v",uid)] = cur_enode
+
+	var keyGenWg sync.WaitGroup
+	keyGenWg.Add(2)
+	go func() {
+		defer keyGenWg.Done()
+		if err := keyGenDNode.Start(); nil != err {
+		    fmt.Printf("==========keygen node start err = %v ==========\n",err)
+			close(errChan)
+		}
+		
+		for _,v := range w.PreSaveDcrmMsg {
+		    w.DcrmMsg <- v 
+		}
+	}()
+	go ProcessInboundMessages(msgprex,commStopChan,&keyGenWg,ch)
+	err := processKeyGen(msgprex,errChan, outCh, endCh)
+	if err != nil {
+	    fmt.Printf("==========process keygen err = %v ==========\n",err)
+	    close(commStopChan)
+	    res := RpcDcrmRes{Ret: "", Err: err}
+	    ch <- res
+	    return false
+	}
+
+	close(commStopChan)
+	keyGenWg.Wait()
 
 	//*******************!!!Distributed ECDSA Start!!!**********************************
 
-	u1, u1Poly, u1PolyG, commitU1G, c1, _, _, commitC1G, u1PaillierPk, u1PaillierSk, status := DECDSAGenKeyRoundOne(msgprex, ch, w)
+	/*u1, u1Poly, u1PolyG, commitU1G, c1, _, _, commitC1G, u1PaillierPk, u1PaillierSk, status := DECDSAGenKeyRoundOne(msgprex, ch, w)
 	if !status {
 		return status
 	}
@@ -2648,7 +2695,7 @@ func KeyGenerate_DECDSA(msgprex string, ch chan interface{}, id int, cointype st
 	if !DECDSAGenKeySaveData(cointype, ids, w, ch, skU1, u1PaillierPk, u1PaillierSk, cs, u1NtildeH1H2) {
 		return false
 	}
-	common.Debug("================generate key================","u1",u1,"sku1",skU1,"key",msgprex)
+	common.Debug("================generate key================","u1",u1,"sku1",skU1,"key",msgprex)*/
 	//*******************!!!Distributed ECDSA End!!!**********************************
 	return true
 }
