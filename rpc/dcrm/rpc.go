@@ -190,7 +190,7 @@ func (this *Service) GetReqAddrStatus(key string) map[string]interface{} {
 }
 
 //lockout
-func (this *Service) LockOut(raw string) map[string]interface{} {
+/*func (this *Service) LockOut(raw string) map[string]interface{} {
 	//fmt.Printf("%v ==========call rpc LockOut from web,raw = %v ===========\n", common.CurrentTime(), raw)
 
 	data := make(map[string]interface{})
@@ -315,7 +315,7 @@ func (this *Service) GetLockOutStatus(key string) map[string]interface{} {
 		"Error":  "",
 		"Data":   data,
 	}
-}
+}*/
 
 //sign
 func (this *Service) AcceptSign(raw string) map[string]interface{} {
@@ -449,7 +449,7 @@ func (this *Service) GetSignStatus(key string) map[string]interface{} {
 }
 
 //reshare
-func (this *Service) ReShare(raw string) map[string]interface{} {
+/*func (this *Service) ReShare(raw string) map[string]interface{} {
 	common.Debug("===================ReShare=====================","raw",raw)
 
 	data := make(map[string]interface{})
@@ -573,7 +573,7 @@ func (this *Service) GetReShareStatus(key string) map[string]interface{} {
 		"Error":  "",
 		"Data":   data,
 	}
-}
+}*/
 
 //raw tx: 
 //data = pubkey + subgids

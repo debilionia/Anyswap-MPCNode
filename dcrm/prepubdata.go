@@ -69,14 +69,6 @@ type PrePubData struct {
 	Used bool //useless? TODO
 }
 
-/*type DelSignData struct {
-	PubKey string
-	PickKey string
-
-	Pbd *PrePubData //for PutPreSign
-}
-*/
-
 type PickHashKey struct {
 	Hash string
 	PickKey string
@@ -318,21 +310,6 @@ func DeletePrePubData(pub string,key string) {
 	PreSignData.WriteMap(strings.ToLower(pub),tmp)
 }
 
-/*func PickPrePubData(pub string) string {
-	data,exsit := PreSignData.ReadMap(strings.ToLower(pub)) 
-	if exsit {
-		datas := data.([]*PrePubData)
-		for _,v := range datas {
-			if v != nil && !v.Used {
-				v.Used = true //bug
-				return v.Key
-			}
-		}
-	}
-
-	return ""
-}*/
-
 func PickPrePubData(pub string) string {
 	data,exsit := PreSignData.ReadMap(strings.ToLower(pub)) 
 	if exsit {
@@ -439,24 +416,12 @@ func CompressSignBrocastData(raw string,pickhash []*PickHashKey) (string,error) 
 	}
 
 	return send,nil
-
-	/*ret,err := Compress([]byte(send))
-	if err != nil {
-		return "",err
-	}
-
-	return ret,nil*/
 }
 
 func UnCompressSignBrocastData(data string) (*SignBrocastData,error) {
 	if data == "" {
 		return nil,fmt.Errorf("Sign Brocast Data error")
 	}
-
-	/*s,err := UnCompress(data)
-	if err != nil {
-		return nil,err
-	}*/
 
 	s := data
 
@@ -652,7 +617,8 @@ func ExcutePreSignData(pre *TxDataPreSignData) {
 				common.Info("=====================ExcutePreSignData in genkey fail========================","pub",pub,"cherr",cherr)
 			    }
 
-			    common.Info("===================generate pre-sign data===============","current total number of the data ",GetTotalCount(pub),"the number of remaining pre-sign data",(PrePubDataCount-GetTotalCount(pub)),"pub",pub,"pubkey",pre.PubKey,"sub-groupid",gg)
+			    //common.Info("===================generate pre-sign data===============","current total number of the data ",GetTotalCount(pub),"the number of remaining pre-sign data",(PrePubDataCount-GetTotalCount(pub)),"pub",pub,"pubkey",pre.PubKey,"sub-groupid",gg)
+			    fmt.Printf("=================generate pre-sign data, current total number of the data = %v,the number of remaining pre-sign data = %v, pub = %v, pubkey = %v, sub-groupid = %v ===================\n",GetTotalCount(pub),(PrePubDataCount-GetTotalCount(pub)),pub,pre.PubKey,gg)
 		    } 
 
 		    time.Sleep(time.Duration(1000000))

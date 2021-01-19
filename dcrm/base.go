@@ -40,12 +40,12 @@ import (
 	//"github.com/anyswap/Anyswap-MPCNode/mpcdsa/crypto/ec2"
 	"github.com/anyswap/Anyswap-MPCNode/p2p/discover"
 	"encoding/gob"
-	"sort"
+	//"sort"
 	"compress/zlib"
 	"github.com/anyswap/Anyswap-MPCNode/crypto/sha3"
 	"io"
 	"github.com/anyswap/Anyswap-MPCNode/internal/common/hexutil"
-	"github.com/anyswap/Anyswap-MPCNode/mpcdsa/crypto/ed"
+	//"github.com/anyswap/Anyswap-MPCNode/mpcdsa/crypto/ed"
 	"github.com/anyswap/Anyswap-MPCNode/crypto/secp256k1"
 	"crypto/hmac"
 	"crypto/sha512"
@@ -434,7 +434,7 @@ func CheckRaw(raw string) (string,string,string,interface{},error) {
 	return key,from.Hex(),fmt.Sprintf("%v", Nonce),&req,nil
     }
     
-    lo := TxDataLockOut{}
+    /*lo := TxDataLockOut{}
     err = json.Unmarshal(tx.Data(), &lo)
     if err == nil && lo.TxType == "LOCKOUT" {
 	dcrmaddr := lo.DcrmAddr
@@ -539,7 +539,7 @@ func CheckRaw(raw string) (string,string,string,interface{},error) {
 
 //	common.Debug("=================CheckRaw, it is lockout tx================","raw ",raw,"key ",key,"lo ",&lo)
 	return key,from.Hex(),fmt.Sprintf("%v", Nonce),&lo,nil
-    }
+    }*/
 
     sig := TxDataSign{}
     err = json.Unmarshal(tx.Data(), &sig)
@@ -652,7 +652,7 @@ func CheckRaw(raw string) (string,string,string,interface{},error) {
 
     //************************/////////////
 
-    rh := TxDataReShare{}
+    /*rh := TxDataReShare{}
     err = json.Unmarshal(tx.Data(), &rh)
     if err == nil && rh.TxType == "RESHARE" {
 	if !IsValidReShareAccept(from.Hex(),rh.GroupId) {
@@ -689,7 +689,7 @@ func CheckRaw(raw string) (string,string,string,interface{},error) {
 	Nonce := tx.Nonce()
 	
 	return key,from.Hex(),fmt.Sprintf("%v", Nonce),&rh,nil
-    }
+    }*/
 
     acceptreq := TxDataAcceptReqAddr{}
     err = json.Unmarshal(tx.Data(), &acceptreq)
@@ -815,9 +815,9 @@ func CheckRaw(raw string) (string,string,string,interface{},error) {
 	    return "","","",nil,fmt.Errorf("mode = 1,do not need to accept")
 	}
 	
-	if !IsValidReShareAccept(from.Hex(),ac.GroupId) {
-	    return "","","",nil,fmt.Errorf("check current enode account fail from raw data")
-	}
+	//if !IsValidReShareAccept(from.Hex(),ac.GroupId) {
+	  //  return "","","",nil,fmt.Errorf("check current enode account fail from raw data")
+	//}
 
 //	common.Debug("=================CheckRaw, it is acceptreshare tx=====================","raw ",raw,"key ",acceptrh.Key,"acceptrh ",&acceptrh)
 	return "",from.Hex(),"",&acceptrh,nil
@@ -1549,7 +1549,7 @@ func GetAllReplyFromGroup(wid int,gid string,rt RpcType,initiator string) []Node
 	}
     } 
     
-    if rt == Rpc_RESHARE {
+    /*if rt == Rpc_RESHARE {
 	for _, node := range nodes {
 		node2 := ParseNode(node)
 		sta := "Pending"
@@ -1618,7 +1618,7 @@ func GetAllReplyFromGroup(wid int,gid string,rt RpcType,initiator string) []Node
 		nr := NodeReply{Enode:node2,Status:sta,TimeStamp:ts,Initiator:in}
 		ars = append(ars,nr)
 	}
-    } 
+    }*/
     
     if rt == Rpc_REQADDR {
 	for _, node := range nodes {
@@ -1902,101 +1902,6 @@ func IsCurNode(enodes string, cur string) bool {
 	return en[0] == cur
 }
 
-func GetEnodesByUid(uid *big.Int, cointype string, groupid string) string {
-	_, nodes := GetGroup(groupid)
-	others := strings.Split(nodes, common.Sep2)
-	for _, v := range others {
-		node2 := ParseNode(v) //bug??
-		id := DoubleHash(node2, cointype)
-		if id.Cmp(uid) == 0 {
-			return v
-		}
-	}
-
-	return ""
-}
-
-type sortableIDSSlice []*big.Int
-
-func (s sortableIDSSlice) Len() int {
-	return len(s)
-}
-
-func (s sortableIDSSlice) Less(i, j int) bool {
-	return s[i].Cmp(s[j]) <= 0
-}
-
-func (s sortableIDSSlice) Swap(i, j int) {
-	s[i], s[j] = s[j], s[i]
-}
-
-func GetIds(cointype string, groupid string) sortableIDSSlice {
-	var ids sortableIDSSlice
-	_, nodes := GetGroup(groupid)
-	others := strings.Split(nodes, common.Sep2)
-	for _, v := range others {
-		node2 := ParseNode(v) //bug??
-		uid := DoubleHash(node2, cointype)
-		ids = append(ids, uid)
-	}
-	sort.Sort(ids)
-	return ids
-}
-
-func GetIds2(keytype string, groupid string) sortableIDSSlice {
-	var ids sortableIDSSlice
-	_, nodes := GetGroup(groupid)
-	others := strings.Split(nodes, common.Sep2)
-	for _, v := range others {
-		node2 := ParseNode(v) //bug??
-		uid := DoubleHash2(node2, keytype)
-		ids = append(ids, uid)
-	}
-	sort.Sort(ids)
-	return ids
-}
-
-func DoubleHash2(id string, keytype string) *big.Int {
-	// Generate the random num
-
-	// First, hash with the keccak256
-	keccak256 := sha3.NewKeccak256()
-	_,err := keccak256.Write([]byte(id))
-	if err != nil {
-	    return nil
-	}
-
-
-	digestKeccak256 := keccak256.Sum(nil)
-
-	//second, hash with the SHA3-256
-	sha3256 := sha3.New256()
-
-	_,err = sha3256.Write(digestKeccak256)
-	if err != nil {
-	    return nil
-	}
-
-	if keytype == "ED25519" {
-	    var digest [32]byte
-	    copy(digest[:], sha3256.Sum(nil))
-
-	    //////
-	    var zero [32]byte
-	    var one [32]byte
-	    one[0] = 1
-	    ed.ScMulAdd(&digest, &digest, &one, &zero)
-	    //////
-	    digestBigInt := new(big.Int).SetBytes(digest[:])
-	    return digestBigInt
-	}
-
-	digest := sha3256.Sum(nil)
-	// convert the hash ([]byte) to big.Int
-	digestBigInt := new(big.Int).SetBytes(digest)
-	return digestBigInt
-}
-
 func GetBip32ChildKey(rootpubkey string,inputcode string) (string,string,error) {
     if rootpubkey == "" || inputcode == "" {
 	return "","param error",fmt.Errorf("param error")
@@ -2120,5 +2025,46 @@ func GetBip32ChildKey(rootpubkey string,inputcode string) (string,string,error) 
     fmt.Printf("===================GetBip32ChildKey, get bip32 pubkey success, rootpubkey = %v, inputcode = %v, child pubkey = %v, addr = %v ===================\n",rootpubkey,inputcode,pubkeyhex,addr)
 
     return pubkeyhex,"",nil
+}
+
+type sortableIDSSlice []*big.Int
+
+func (s sortableIDSSlice) Len() int {
+	return len(s)
+}
+
+func (s sortableIDSSlice) Less(i, j int) bool {
+	return s[i].Cmp(s[j]) <= 0
+}
+
+func (s sortableIDSSlice) Swap(i, j int) {
+	s[i], s[j] = s[j], s[i]
+}
+
+func DoubleHash2(id string, keytype string) *big.Int {
+	// Generate the random num
+
+	// First, hash with the keccak256
+	keccak256 := sha3.NewKeccak256()
+	_,err := keccak256.Write([]byte(id))
+	if err != nil {
+	    return nil
+	}
+
+
+	digestKeccak256 := keccak256.Sum(nil)
+
+	//second, hash with the SHA3-256
+	sha3256 := sha3.New256()
+
+	_,err = sha3256.Write(digestKeccak256)
+	if err != nil {
+	    return nil
+	}
+
+	digest := sha3256.Sum(nil)
+	// convert the hash ([]byte) to big.Int
+	digestBigInt := new(big.Int).SetBytes(digest)
+	return digestBigInt
 }
 

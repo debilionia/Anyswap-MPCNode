@@ -13,6 +13,8 @@ type DNode interface {
 	DNodeID() string
 	StoreMessage(msg Message) (bool, error)
 	SetDNodeID(id string)
+	Finalize() bool
+	FinalizeRound() Round
 
 	// Private lifecycle methods
 	setRound(Round) error
@@ -70,10 +72,18 @@ func BaseStart(p DNode) error {
 		return errors.New("could not start. this dcrm node is in an unexpected state. use the constructor and Start()")
 	}
 
-	round := p.FirstRound()
-	if err := p.setRound(round); err != nil {
-		return err
+	if p.Finalize() {
+	    round := p.FinalizeRound()
+	    if err := p.setRound(round); err != nil {
+		    return err
+	    }
+	} else {
+	    round := p.FirstRound()
+	    if err := p.setRound(round); err != nil {
+		    return err
+	    }
 	}
+
 	return p.Round().Start()
 }
 

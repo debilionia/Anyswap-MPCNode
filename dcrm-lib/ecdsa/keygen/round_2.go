@@ -3,6 +3,7 @@ package keygen
 import (
 	"errors"
 	"fmt"
+	"math/big"
 	"github.com/anyswap/Anyswap-MPCNode/dcrm-lib/crypto/ec2"
 	"github.com/anyswap/Anyswap-MPCNode/dcrm-lib/dcrm"
 )
@@ -19,6 +20,8 @@ func (round *round2) Start() error {
 	if err != nil {
 	    return errors.New("round.Start get ids fail.")
 	}
+	round.Save.Ids = ids
+	round.Save.CurDNodeID,_ = new(big.Int).SetString(round.dnodeid,10)
 
 	u1Shares,err := round.temp.u1Poly.Vss2(ids)
 	if err != nil {

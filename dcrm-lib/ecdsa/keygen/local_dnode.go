@@ -107,6 +107,14 @@ func (p *LocalDNode) FirstRound() dcrm.Round {
 	return newRound0(&p.data, &p.temp,p.out, p.end,p.Id,p.DNodeCountInGroup,p.ThresHold,p.PaillierKeyLength)
 }
 
+func (p *LocalDNode) FinalizeRound() dcrm.Round {
+    return nil
+}
+
+func (p *LocalDNode) Finalize() bool {
+    return false
+}
+
 func (p *LocalDNode) Start() error {
 	return dcrm.BaseStart(p)
 }

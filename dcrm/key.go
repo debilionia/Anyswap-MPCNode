@@ -260,9 +260,11 @@ func processKeyGen(msgprex string,errChan chan struct{},outCh <-chan dcrmlib.Mes
 			w.pky.PushBack(fmt.Sprintf("%v",msg.Pky))
 			w.bip32c.PushBack(fmt.Sprintf("%v",msg.C))
 			w.sku1.PushBack(fmt.Sprintf("%v",msg.SkU1))
-
 			fmt.Printf("\n===========keygen finished successfully, pkx = %v,pky = %v ===========\n",msg.Pkx,msg.Pky)
-			sdout := (&msg).OutMap()
+
+			kgsave := &KGLocalDBSaveData{Save:(&msg),MsgToEnode:w.MsgToEnode}
+			//sdout := (&msg).OutMap()
+			sdout := kgsave.OutMap()
 			s,err := json.Marshal(sdout)
 			if err != nil {
 			    return err
@@ -273,6 +275,31 @@ func processKeyGen(msgprex string,errChan chan struct{},outCh <-chan dcrmlib.Mes
 			return nil
 		}
 	}
+}
+
+type KGLocalDBSaveData struct {
+    Save *dcrmlib.LocalDNodeSaveData
+    MsgToEnode map[string]string
+}
+
+func (kgsave *KGLocalDBSaveData) OutMap() map[string]string {
+    out := kgsave.Save.OutMap()
+    for key,value := range kgsave.MsgToEnode {
+	out[key] = value
+    }
+
+    return out
+}
+
+func GetKGLocalDBSaveData(data map[string]string) *KGLocalDBSaveData {
+    save := dcrmlib.GetLocalDNodeSaveData(data)
+    msgtoenode := make(map[string]string)
+    for _,v := range save.Ids {
+	msgtoenode[fmt.Sprintf("%v",v)] = data[fmt.Sprintf("%v",v)]
+    }
+
+    kgsave := &KGLocalDBSaveData{Save:save,MsgToEnode:msgtoenode}
+    return kgsave
 }
 
 func ProcessOutCh(msgprex string,msg dcrmlib.Message) error {
