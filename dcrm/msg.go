@@ -653,7 +653,7 @@ func Call(msg interface{}, enode string) {
 	}
 	/////
 
-	SetUpMsgList(s, enode)
+	SetUpMsgList(s,enode)
 }
 
 func SetUpMsgList(msg string, enode string) {
@@ -754,7 +754,7 @@ func InitPreSign(raw string,workid int,sender string,ch chan interface{}) bool {
 		    return false
 		}
 		sku1 := sd.SkU1
-		fmt.Printf("===================RecvMsg.Run,local save data = %v ===================\n",sd)
+		fmt.Printf("===================InitPreSign, local save data = %v ===================\n",sd)
 		//////////////
 		
 		childSKU1 := sku1
@@ -827,7 +827,7 @@ func InitPreSign(raw string,workid int,sender string,ch chan interface{}) bool {
 			    PutPreSign(pub,pre)
 	    
 			    es,err := Encode2(pre)
-			    common.Debug("========================PreSign at RecvMsg.Run finish,ecode pre-sign data.=================","err",err,"pick key",pre.Key)
+			    common.Debug("========================InitPreSign,finish,ecode pre-sign data.=================","err",err,"pick key",pre.Key)
 			    if err == nil {
 				kd := UpdataPreSignData{Key: []byte(strings.ToLower(pub)), Del:false,Data: es}
 				PrePubKeyDataChan <- kd
@@ -836,7 +836,7 @@ func InitPreSign(raw string,workid int,sender string,ch chan interface{}) bool {
 			    DtPreSign.Unlock()
 		    //}
 
-		    fmt.Printf("=================PreSign at RecvMsg.Run finish,it is success. =================\n",)
+		    fmt.Printf("=================InitPreSign,finish,it is success. =================\n",)
 		    res := RpcDcrmRes{Ret: "success", Tip: "", Err: nil}
 		    ch <- res
 		    return true
@@ -1634,19 +1634,19 @@ func KeyInitAcceptData(raw string,workid int,sender string,ch chan interface{}) 
     
     req,ok := txdata.(*TxDataReqAddr)
     if ok {
-	common.Info("===============InitAcceptData, check reqaddr raw success==================","raw ",raw,"key ",key,"from ",from,"nonce ",nonce,"txdata ",req)
+	common.Info("===============KeyInitAcceptData, check reqaddr raw success==================","raw ",raw,"key ",key,"from ",from,"nonce ",nonce,"txdata ",req)
 	exsit,_ := GetValueFromPubKeyData(key)
 	if !exsit {
 	    cur_nonce, _, _ := GetReqAddrNonce(from)
 	    cur_nonce_num, _ := new(big.Int).SetString(cur_nonce, 10)
 	    new_nonce_num, _ := new(big.Int).SetString(nonce, 10)
-	    common.Debug("===============InitAcceptData============","reqaddr cur_nonce_num ",cur_nonce_num,"reqaddr new_nonce_num ",new_nonce_num,"key ",key)
+	    common.Debug("===============KeyInitAcceptData============","reqaddr cur_nonce_num ",cur_nonce_num,"reqaddr new_nonce_num ",new_nonce_num,"key ",key)
 	    if new_nonce_num.Cmp(cur_nonce_num) >= 0 {
 		_, err := SetReqAddrNonce(from,nonce)
 		if err == nil {
 		    ars := GetAllReplyFromGroup(workid,req.GroupId,Rpc_REQADDR,sender)
 		    sigs,err := GetGroupSigsDataByRaw(raw) 
-		    common.Info("=================InitAcceptData================","get group sigs ",sigs,"err ",err,"key ",key)
+		    common.Info("=================KeyInitAcceptData================","get group sigs ",sigs,"err ",err,"key ",key)
 		    if err != nil {
 			res := RpcDcrmRes{Ret: "", Tip: err.Error(), Err: err}
 			ch <- res
@@ -1711,7 +1711,7 @@ func KeyInitAcceptData(raw string,workid int,sender string,ch chan interface{}) 
 						case account := <-wtmp2.acceptReqAddrChan:
 							common.Debug("(self *RecvMsg) Run(),", "account= ", account, "key = ", key)
 							ars := GetAllReplyFromGroup(w.id,req.GroupId,Rpc_REQADDR,sender)
-							common.Info("================== InitAcceptData,get all AcceptReqAddrRes====================","raw ",raw,"result ",ars,"key ",key)
+							common.Info("================== KeyInitAcceptData,get all AcceptReqAddrRes====================","raw ",raw,"result ",ars,"key ",key)
 							
 							//bug
 							reply = true
@@ -1745,7 +1745,7 @@ func KeyInitAcceptData(raw string,workid int,sender string,ch chan interface{}) 
 							timeout <- true
 							return
 						case <-agreeWaitTimeOut.C:
-							common.Info("================== InitAcceptData, agree wait timeout==================","raw ",raw,"key ",key)
+							common.Info("================== KeyInitAcceptData, agree wait timeout==================","raw ",raw,"key ",key)
 							ars := GetAllReplyFromGroup(w.id,req.GroupId,Rpc_REQADDR,sender)
 							//bug: if self not accept and timeout
 							_,err = AcceptReqAddr(sender,from, "ALL", req.GroupId, nonce, req.ThresHold, req.Mode, "false", "false", "Timeout", "", "get other node accept req addr result timeout", "get other node accept req addr result timeout", ars, wid,"")
@@ -1775,7 +1775,7 @@ func KeyInitAcceptData(raw string,workid int,sender string,ch chan interface{}) 
 
 				<-timeout
 
-				common.Debug("================== InitAcceptData======================","raw ",raw,"the terminal accept req addr result ",reply,"key ",key)
+				common.Debug("================== KeyInitAcceptData======================","raw ",raw,"the terminal accept req addr result ",reply,"key ",key)
 
 				ars := GetAllReplyFromGroup(w.id,req.GroupId,Rpc_REQADDR,sender)
 				if !reply {
@@ -1809,10 +1809,10 @@ func KeyInitAcceptData(raw string,workid int,sender string,ch chan interface{}) 
 				}
 			}
 
-			common.Info("================== InitAcceptData, start call dcrm_genPubKey====================","w.id ",w.id,"w.groupid ",w.groupid,"key ",key)
+			common.Info("================== KeyInitAcceptData, start call dcrm_genPubKey====================","w.id ",w.id,"w.groupid ",w.groupid,"key ",key)
 			dcrm_genPubKey(w.sid, from, "ALL", rch, req.Mode, nonce)
 			chret, tip, cherr := GetChannelValue(waitall, rch)
-			common.Info("================== InitAcceptData , finish dcrm_genPubKey ===================","get return value ",chret,"err ",cherr,"key ",key)
+			common.Info("================== KeyInitAcceptData , finish dcrm_genPubKey ===================","get return value ",chret,"err ",cherr,"key ",key)
 			if cherr != nil {
 				ars := GetAllReplyFromGroup(w.id,req.GroupId,Rpc_REQADDR,sender)
 				_,err = AcceptReqAddr(sender,from, "ALL", req.GroupId, nonce, req.ThresHold, req.Mode, "false", "", "Failure", "", tip, cherr.Error(), ars, workid,"")
