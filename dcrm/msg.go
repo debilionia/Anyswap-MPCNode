@@ -569,7 +569,7 @@ func Call(msg interface{}, enode string) {
 	////////
 	raw,err := UnCompress(s)
 	if err == nil {
-		s = raw
+	    s = raw
 	}
 	////////
 
@@ -633,7 +633,7 @@ func Call(msg interface{}, enode string) {
 	    return
 	}
 	
-	key,ok = IsSignCmd(s)
+	/*key,ok = IsSignCmd(s)
 	if ok {
 	    w, err := FindWorker(key)
 	    if err == nil {
@@ -646,6 +646,22 @@ func Call(msg interface{}, enode string) {
 		}
 	    } else {
 		fmt.Printf("\n============Call,sign cmd arrive before dcrm msg. key = %v, msg = %v ==============\n",key,msgmap)
+		SetUpMsgList(s, enode)
+	    }
+	    
+	    return
+	}*/
+	
+	key,ok = IsSignDataCmd(s)
+	if ok {
+	    w, err := FindWorker(key)
+	    if err == nil {
+		fmt.Printf("\n============Call,signdata cmd arrive after dcrm msg. key = %v, msg = %v ==============\n",key,msgmap)
+		ch := make(chan interface{}, 1)
+		InitSignData(s,w.id,enode,ch)
+		w.bwire <-true //add for dcrm-lib
+	    } else {
+		fmt.Printf("\n============Call,signdata cmd arrive before dcrm msg. key = %v, msg = %v ==============\n",key,msgmap)
 		SetUpMsgList(s, enode)
 	    }
 	    
@@ -848,6 +864,149 @@ func InitPreSign(raw string,workid int,sender string,ch chan interface{}) bool {
     return false
 }
 
+func InitSignData(raw string,workid int,sender string,ch chan interface{}) bool {
+    if raw == "" || workid < 0 || sender == "" {
+	res := RpcDcrmRes{Ret: "", Tip: "init accept data fail.", Err: fmt.Errorf("init accept data fail")}
+	ch <- res
+	return false
+    }
+    
+    m, err := Decode2(raw, "SignData")
+    if err == nil {
+	sd,ok := m.(*SignData)
+	if ok {
+
+	    ys := secp256k1.S256().Marshal(sd.Pkx, sd.Pky)
+	    pubkeyhex := hex.EncodeToString(ys)
+	    var pub string
+	    if sd.InputCodeT != "" {
+		pub = Keccak256Hash([]byte(strings.ToLower(pubkeyhex + ":" + sd.InputCodeT + ":" + sd.GroupId))).Hex()
+	    } else {
+		pub = Keccak256Hash([]byte(strings.ToLower(pubkeyhex + ":" + sd.GroupId))).Hex()
+	    }
+	    pre := GetPrePubDataBak(pub,sd.PickKey)
+	    if pre == nil {
+			common.Info("=============== InitSignData,it is signdata, get pre sign data fail===================","msgprex",sd.MsgPrex,"key",sd.Key,"pick key",sd.PickKey,"pub",pub)
+			res2 := RpcDcrmRes{Ret: "", Tip: "dcrm back-end internal error:get pre sign data fail", Err: fmt.Errorf("get pre sign data fail")}
+			ch <- res2
+			return false
+	    }
+
+	    w := workers[workid]
+	    w.sid = sd.Key
+	    w.groupid = sd.GroupId
+	    
+	    w.NodeCnt = sd.NodeCnt
+	    w.ThresHold = sd.ThresHold
+	    
+	    w.DcrmFrom = sd.DcrmFrom
+
+	    dcrmpks, _ := hex.DecodeString(pubkeyhex)
+	    exsit,da := GetPubKeyDataFromLocalDb(string(dcrmpks[:]))
+	    if exsit {
+		    pd,ok := da.(*PubKeyData)
+		    if ok {
+			exsit,da2 := GetValueFromPubKeyData(pd.Key)
+			if exsit {
+				ac,ok := da2.(*AcceptReqAddrData)
+				if ok {
+				    HandleC1Data(ac,sd.Key,workid)
+				}
+			}
+
+		    }
+	    }
+
+	    childPKx := sd.Pkx
+	    childPKy := sd.Pky 
+	    if sd.InputCodeT != "" {
+		da3 := GetBip32CFromLocalDb(string(dcrmpks[:]))
+		if da3 == nil {
+		    res := RpcDcrmRes{Ret: "", Tip: "presign get bip32 fail", Err: fmt.Errorf("presign get bip32 fail")}
+		    ch <- res
+		    return false
+		}
+		bip32c := new(big.Int).SetBytes(da3)
+		if bip32c == nil {
+		    res := RpcDcrmRes{Ret: "", Tip: "presign get bip32 error", Err: fmt.Errorf("presign get bip32 error")}
+		    ch <- res
+		    return false
+		}
+		
+		indexs := strings.Split(sd.InputCodeT, "/")
+		TRb := bip32c.Bytes()
+		childSKU1 := sd.Sku1
+		for idxi := 1; idxi <len(indexs); idxi++ {
+			h := hmac.New(sha512.New, TRb)
+		    h.Write(childPKx.Bytes())
+		    h.Write(childPKy.Bytes())
+		    h.Write([]byte(indexs[idxi]))
+			T := h.Sum(nil)
+			TRb = T[32:]
+			TL := new(big.Int).SetBytes(T[:32])
+
+			childSKU1 = new(big.Int).Add(TL, childSKU1)
+			childSKU1 = new(big.Int).Mod(childSKU1, secp256k1.S256().N)
+
+			TLGx, TLGy := secp256k1.S256().ScalarBaseMult(TL.Bytes())
+			childPKx, childPKy = secp256k1.S256().Add(TLGx, TLGy, childPKx, childPKy)
+		}
+	    }
+	    
+	    childpub := secp256k1.S256().Marshal(childPKx,childPKy)
+	    childpubkeyhex := hex.EncodeToString(childpub)
+	    addr,_,err := GetDcrmAddr(childpubkeyhex)
+	    if err != nil {
+		res := RpcDcrmRes{Ret: "", Tip: "get pubkey error", Err: fmt.Errorf("get pubkey error")}
+		ch <- res
+		return false
+	    }
+	    fmt.Printf("=================== InitSignData, sign, pubkey = %v, inputcode = %v, addr = %v ===================\n",childpubkeyhex,sd.InputCodeT,addr)
+
+	    var ch1 = make(chan interface{}, 1)
+	    for i:=0;i < recalc_times;i++ {
+		common.Debug("=============== InitSignData,sign recalc===================","i",i,"msgprex",sd.MsgPrex,"key",sd.Key)
+		if len(ch1) != 0 {
+		    <-ch1
+		}
+
+		//w.Clear2()
+		//Sign_ec2(sd.Key, sd.Save, sd.Sku1, sd.Txhash, sd.Keytype, sd.Pkx, sd.Pky, ch1, workid)
+		Sign_ec3(sd.Key,sd.Txhash,sd.Keytype,sd.Save,childPKx,childPKy,ch1,workid,pre)
+		common.Info("=============== InitSignData, ec3 sign finish ===================","WaitMsgTimeGG20",WaitMsgTimeGG20)
+		ret, _, cherr := GetChannelValue(WaitMsgTimeGG20 + 10, ch1)
+		if ret != "" && cherr == nil {
+
+		    ww, err := FindWorker(sd.MsgPrex)
+		    if err != nil || ww == nil {
+			res2 := RpcDcrmRes{Ret: "", Tip: "dcrm back-end internal error:no find worker", Err: fmt.Errorf("no find worker")}
+			ch <- res2
+			return false
+		    }
+
+		    common.Info("=============== InitSignData, ec3 sign success ===================","i",i,"get ret",ret,"cherr",cherr,"msgprex",sd.MsgPrex,"key",sd.Key)
+
+		    ww.rsv.PushBack(ret)
+		    res2 := RpcDcrmRes{Ret: ret, Tip: "", Err: nil}
+		    ch <- res2
+		    return true 
+		}
+		
+		common.Info("=============== InitSignData,ec3 sign fail===================","ret",ret,"cherr",cherr,"msgprex",sd.MsgPrex,"key",sd.Key)
+		//time.Sleep(time.Duration(3) * time.Second) //1000 == 1s
+	    }	
+	    
+	    res2 := RpcDcrmRes{Ret: "", Tip: "sign fail", Err: fmt.Errorf("sign fail")}
+	    ch <- res2
+	    return false 
+	}
+    }
+    
+    res := RpcDcrmRes{Ret: "", Tip: "init sign data fail.", Err: fmt.Errorf("init sign data fail")}
+    ch <- res
+    return false
+}
+ 
 func (self *RecvMsg) Run(workid int, ch chan interface{}) bool {
 	if workid < 0 || workid >= RPCMaxWorker { //TODO
 		res2 := RpcDcrmRes{Ret: "", Tip: "dcrm back-end internal error:get worker id fail", Err: fmt.Errorf("no find worker.")}
@@ -927,6 +1086,16 @@ func (self *RecvMsg) Run(workid int, ch chan interface{}) bool {
 		}
 
 		w := workers[workid]
+		///////bug
+		for k,v := range workers {
+		    if strings.EqualFold(v.sid, sd.Key) {
+			b := InitSignData(res,k,self.sender,ch)
+			v.bwire <-true //add for dcrm-lib
+			return b
+		    }
+		}
+		//////////
+
 		w.sid = sd.Key
 		w.groupid = sd.GroupId
 		
@@ -1612,6 +1781,18 @@ func IsSignCmd(raw string) (string,bool) {
 	    if ok {
 		return key,true
 	    }
+	}
+    }
+
+    return "",false
+}
+
+func IsSignDataCmd(raw string) (string,bool) {
+    m, err := Decode2(raw, "SignData")
+    if err == nil {
+	sd,ok := m.(*SignData)
+	if ok {
+	    return sd.Key,true
 	}
     }
 
