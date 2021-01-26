@@ -373,7 +373,7 @@ func NewRPCReqWorker(workerPool chan chan RPCReq) *RPCReqWorker {
 		
 		msg_wire:                    list.New(),
 		bwire:               make(chan bool, 1),
-		DcrmMsg:            make(chan string,20000),
+		DcrmMsg:            make(chan string,100),
 		MsgToEnode:            make(map[string]string),
 		PreSaveDcrmMsg:     make([]string,0),
 	}
@@ -786,7 +786,7 @@ func (w *RPCReqWorker) Clear() {
 	if len(w.bwire) == 1 {
 		<-w.bwire
 	}
-	w.DcrmMsg = make(chan string,20000)
+	w.DcrmMsg = make(chan string,100)
 	w.DNode = nil
 	w.MsgToEnode = make(map[string]string)
 	w.PreSaveDcrmMsg = make([]string,0)
@@ -1191,7 +1191,7 @@ func (w *RPCReqWorker) Clear2() {
 	if len(w.bwire) == 1 {
 		<-w.bwire
 	}
-	w.DcrmMsg = make(chan string,20000)
+	w.DcrmMsg = make(chan string,100)
 	w.DNode = nil
 	w.MsgToEnode = make(map[string]string)
 	w.PreSaveDcrmMsg = make([]string,0)

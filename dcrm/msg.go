@@ -1042,8 +1042,10 @@ func (self *RecvMsg) Run(workid int, ch chan interface{}) bool {
 	if err == nil {
 	    val,ok := msgmap["Key"]
 	    if ok {
+		fmt.Printf("===============RecvMsg.Run, dcrm msg,begin to check sid, key = %v =====================\n",val)
 		for _,v := range workers {
 		    if strings.EqualFold(v.sid, val) {
+			fmt.Printf("===============RecvMsg.Run, dcrm msg,sid check success, key = %v =====================\n",val)
 			if v.DNode != nil && v.DNode.Round() != nil {
 			    v.DcrmMsg <- res 
 			} else {
@@ -1052,6 +1054,7 @@ func (self *RecvMsg) Run(workid int, ch chan interface{}) bool {
 			return true
 		    }
 		}
+		fmt.Printf("===============RecvMsg.Run, dcrm msg,end to check sid, key = %v =====================\n",val)
 
 		w := workers[workid]
 		w.sid = val 
@@ -1087,6 +1090,7 @@ func (self *RecvMsg) Run(workid int, ch chan interface{}) bool {
 
 		w := workers[workid]
 		///////bug
+		fmt.Printf("===============RecvMsg.Run, sign data, begin to check sid, key = %v =====================\n",sd.Key)
 		for k,v := range workers {
 		    if strings.EqualFold(v.sid, sd.Key) {
 			b := InitSignData(res,k,self.sender,ch)
@@ -1094,6 +1098,7 @@ func (self *RecvMsg) Run(workid int, ch chan interface{}) bool {
 			return b
 		    }
 		}
+		fmt.Printf("===============RecvMsg.Run, sign data, end to check sid, key = %v =====================\n",sd.Key)
 		//////////
 
 		w.sid = sd.Key
